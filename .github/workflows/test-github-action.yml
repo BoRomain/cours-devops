@@ -1,13 +1,13 @@
 on: push
 
 jobs:
-  build:
+  e2e-tests:
     runs-on: ubuntu-latest
-    steps:
-      - run: ls -lah
 
-  build2:
-    runs-on: ubuntu-latest
-    needs: build
     steps:
-      - run: ls -lah
+      - uses: actions/checkout@v4
+
+      - uses: cypress-io/github-action@v6
+        with:
+          start: npm run start
+          wait-on: 'http://localhost:3000'
