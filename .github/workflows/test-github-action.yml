@@ -46,9 +46,7 @@ jobs:
       - name: Git pull sur la VM
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ${{ secrets.VM_PATH }}
-            cd dev
-            cd cours-devops
+            cd ${{ secrets.VM_PATH }}/dev/cours-devops
             git pull origin devlop
             pm2 restart next-dev
             echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
@@ -70,9 +68,7 @@ jobs:
       - name: Git pull sur la VM
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ${{ secrets.VM_PATH }}
-            cd prod
-            cd cours-devops
+            cd ${{ secrets.VM_PATH }}/prod/cours-devops
             git pull origin main
             pm2 restart next-prod
             echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
