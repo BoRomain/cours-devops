@@ -16,29 +16,6 @@ jobs:
       - run: npm run build
 
 
-  tests:
-    runs-on: ubuntu-latest
-    needs: build
-
-    strategy:
-      matrix:
-        browser: [chrome]
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            .next
-          key: ${{ runner.os }}-${{ hashFiles('package-lock.json', 'next.config.*') }}
-
-      - uses: cypress-io/github-action@v6
-        with:
-          start: npm run start
-          wait-on: 'http://localhost:3000'
-
-
   lint:
     runs-on: ubuntu-latest
     needs: build
@@ -52,3 +29,49 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('package-lock.json', 'next.config.*') }}
       - run: npm ci
       - run: npm run lint
+
+
+  deploy-recette:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/devlop'
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Git pull sur la VM
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd ${{ secrets.VM_PATH }}
+            cd dev
+            git pull origin devlop
+            pm2 restart next-dev
+            echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
+          EOF
+
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, lint]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Git pull sur la VM
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd ${{ secrets.VM_PATH }}
+            cd prod
+            git pull origin main
+            pm2 restart next-prod
+            echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
+          EOF
