@@ -31,45 +31,37 @@ jobs:
       - run: npm run lint
 
 
-  deploy-recette:
+  build-and-push-docker:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/devlop'
+    
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Git pull sur la VM
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ${{ secrets.VM_PATH }}/dev/cours-devops
-            git pull origin devlop
-            pm2 restart next-dev
-            echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
-          EOF
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
 
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: [build, lint]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Git pull sur la VM
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ${{ secrets.VM_PATH }}/prod/cours-devops
-            git pull origin main
-            pm2 restart next-prod
-            echo "✅ Mise à jour terminée : $(git log -1 --oneline)"
-          EOF
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker stop my-app || true
+            docker rm my-app || true
+            docker run -d --name my-app -p 80:3000 ghcr.io/${{ github.repository }}:latest
