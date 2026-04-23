@@ -1,7 +1,5 @@
 services:
   app:
-    build: .
+    container_name: cours-devops
     ports:
       - "3000:3000"
-    volumes:
-      - .:/usr/src/app
