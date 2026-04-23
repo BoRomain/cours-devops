@@ -1,3 +1,6 @@
 services:
   app:
+    image: ghcr.io/${REPO_LOWER}:latest
     restart: always
+    ports:
+      - "3000:3000"
